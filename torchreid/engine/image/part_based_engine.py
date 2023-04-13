@@ -370,7 +370,7 @@ class ImagePartBasedEngine(Engine):
 
         for test_emb in self.config.model.bpbreid.test_embeddings:
             embds = embeddings[test_emb]
-            embeddings_list.append(embds if len(embds.shape) == 3 else embds.unsqueeze(1))
+            embeddings_list.append(embds if len(embds.shape) == 3 else embds.unsqueeze(1))#BN_GLOBAL[N, D]+BN_PARTS[N, K, D]
             if test_emb in bn_correspondants:
                 test_emb = bn_correspondants[test_emb]
             vis_scores = visibility_scores[test_emb]

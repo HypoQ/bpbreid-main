@@ -10,7 +10,7 @@ def visualize_embeddings(qf, gf, q_pids, g_pids, test_loader, dataset_name, qf_p
     query_dataset = test_loader['query'].dataset
     gallery_dataset = test_loader['gallery'].dataset
     # TODO 1000 identities and 5 samples per identity
-    sample_size = 1000
+    sample_size = 10
     q_embeddings, q_imgs, q_meta, q_idx_list = extract_samples(qf, query_dataset, sample_size)
     g_embeddings, g_imgs, g_meta, g_idx_list = extract_samples(gf, gallery_dataset, sample_size)
 
@@ -25,7 +25,7 @@ def visualize_embeddings(qf, gf, q_pids, g_pids, test_loader, dataset_name, qf_p
 
 def extract_samples(features, dataset, sample_size):
     sample_size = min(sample_size, len(dataset))
-    remaining_idx = np.arange(0, len(dataset))
+    remaining_idx = np.arange(0, 56)
 
     idx_list = np.random.choice(remaining_idx, replace=False, size=sample_size)
 

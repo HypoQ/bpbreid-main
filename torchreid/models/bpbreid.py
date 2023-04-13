@@ -144,8 +144,9 @@ class BPBreID(nn.Module):
             pixels_parts_probabilities = pcb_masks
             pixels_parts_probabilities.requires_grad = False
         elif self.learnable_attention_enabled:
-            pixels_cls_scores = self.pixel_classifier(spatial_features)  # [N, K, Hf, Wf]
-            pixels_parts_probabilities = F.softmax(pixels_cls_scores, dim=1)# [N, K, Hf, Wf]
+            pixels_cls_scores = self.pixel_classifier(spatial_features)  # [N, K, Hf, Wf]通过1x1的2d卷积，对特征进行抽象提取得到[B,9,96,32]
+            pixels_parts_probabilities = F.softmax(pixels_cls_scores, dim=1)# [N, K, Hf, Wf]利用softmax进行分类[B,9,96,32]
+            #公式(1)
         else:
             pixels_cls_scores = None
             assert external_parts_masks is not None
@@ -154,11 +155,11 @@ class BPBreID(nn.Module):
             pixels_parts_probabilities.requires_grad = False
             assert pixels_parts_probabilities.max() <= 1 and pixels_parts_probabilities.min() >= 0
 
-        background_masks = pixels_parts_probabilities[:, 0]# [N, 1, Hf, Wf]
-        parts_masks = pixels_parts_probabilities[:, 1:]# [N, K, Hf, Wf]
+        background_masks = pixels_parts_probabilities[:, 0]# [N, 1, Hf, Wf]在第二个维度0index位置为背景掩码
+        parts_masks = pixels_parts_probabilities[:, 1:]# [N, K, Hf, Wf]其他位置为body-part掩码
 
         # Explicit pixels segmentation of re-id target using external part masks
-        if not self.training and self.test_use_target_segmentation == 'hard':
+        if not self.training and self.test_use_target_segmentation == 'hard':#在测试时是否利用额外的掩码信息
             assert external_parts_masks is not None
             # hard masking
             external_parts_masks = nn.functional.interpolate(external_parts_masks, (Hf, Wf), mode='bilinear',
@@ -175,13 +176,18 @@ class BPBreID(nn.Module):
             parts_masks = parts_masks * external_parts_masks[:, 1::]
 
         # foreground_masks = parts_masks.sum(dim=1)
-        foreground_masks = parts_masks.max(dim=1)[0]
-        global_masks = torch.ones_like(foreground_masks)
+        foreground_masks = parts_masks.max(dim=1)[0]#对body-part掩码进行融合，取8个掩码中每个[96，32]的像素点上的最大值
+        global_masks = torch.ones_like(foreground_masks)#生成全局掩码[B,96,32]全1
 
         # Parts visibility
         if (self.training and self.training_binary_visibility_score) or (not self.training and self.testing_binary_visibility_score):
-            pixels_parts_predictions = pixels_parts_probabilities.argmax(dim=1)  # [N, Hf, Wf]
+            # [N, Hf, Wf]取每个body-part掩码的最大值的所引0-9分别表示每个像素的预测
+            pixels_parts_predictions = pixels_parts_probabilities.argmax(dim=1)
+
+            #对于每个像素映射成one-hot掩码，每个像素标签为长度为9的one-hot向量，对应part位置的值为1，在转换为[1,9,96,32]9个[96，32]上对应像素为该part为1
             pixels_parts_predictions_one_hot = F.one_hot(pixels_parts_predictions, self.parts_num + 1).permute(0, 3, 1, 2)  # [N, K+1, Hf, Wf]
+
+            #判断每个我part是否有1个像素断定为该part，一个都没有则该part不可见
             parts_visibility = pixels_parts_predictions_one_hot.amax(dim=(2, 3)).to(torch.bool)  # [N, K+1]
         else:
             parts_visibility = pixels_parts_probabilities.amax(dim=(2, 3))  # [N, K+1]
@@ -211,7 +217,7 @@ class BPBreID(nn.Module):
         # Concatenated part features
         concat_parts_embeddings = parts_embeddings.flatten(1, 2)  # [N, K*D]
 
-        # Identity classification scores
+        # Identity classification scores通过BN层和全连接层输出BN特征和交叉熵计算分数
         bn_global_embeddings, global_cls_score = self.global_identity_classifier(global_embeddings)  # [N, D], [N, num_classes]
         bn_background_embeddings, background_cls_score = self.background_identity_classifier(background_embeddings)  # [N, D], [N, num_classes]
         bn_foreground_embeddings, foreground_cls_score = self.foreground_identity_classifier(foreground_embeddings)  # [N, D], [N, num_classes]

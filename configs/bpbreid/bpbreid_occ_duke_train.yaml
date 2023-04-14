@@ -1,5 +1,5 @@
 data:
-  root: '~/datasets/reid'
+  root: '/mnt3/qhb/datasets'
   sources: ['occluded_duke']
   targets: ['occluded_duke']
   height: 384
@@ -36,6 +36,7 @@ loss:
       parts:
         id: 0.
         tr: 1.
+        cr: 0.
       pixls:
         ce: 0.35
 
@@ -44,5 +45,5 @@ train:
 
 test:
   evaluate: False
-  batch_size: 64
+  batch_size: 32
   visrank: True

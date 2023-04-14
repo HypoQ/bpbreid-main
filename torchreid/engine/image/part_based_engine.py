@@ -24,6 +24,7 @@ class ImagePartBasedEngine(Engine):
     """
     def __init__(
             self,
+            num_classes,
             datamanager,
             model,
             optimizer,
@@ -38,7 +39,7 @@ class ImagePartBasedEngine(Engine):
             use_gpu=True,
             save_model_flag=False,
             mask_filtering_training=False,
-            mask_filtering_testing=False
+            mask_filtering_testing=False,
     ):
         super(ImagePartBasedEngine, self).__init__(config,
                                                    datamanager,
@@ -52,6 +53,7 @@ class ImagePartBasedEngine(Engine):
         self.register_model('model', model, optimizer, scheduler)
         self.optimizer = optimizer
         self.scheduler = scheduler
+        self.num_classes = num_classes
         self.parts_num = self.config.model.bpbreid.masks.parts_num
         self.mask_filtering_training = mask_filtering_training
         self.mask_filtering_testing = mask_filtering_testing
@@ -60,12 +62,14 @@ class ImagePartBasedEngine(Engine):
         self.losses_weights = self.config.loss.part_based.weights
 
         # Losses
-        self.GiLt = GiLtLoss(self.losses_weights,
+        self.GiLt = GiLtLoss(self.num_classes,
+                             self.losses_weights,
                              use_visibility_scores=self.mask_filtering_training,
                              triplet_margin=margin,
                              loss_name=loss_name,
                              writer=self.writer,
-                             use_gpu=self.use_gpu)
+                             use_gpu=self.use_gpu,
+                             )
 
         self.body_part_attention_loss = BodyPartAttentionLoss(loss_type=self.config.loss.part_based.ppl, use_gpu=self.use_gpu)
 

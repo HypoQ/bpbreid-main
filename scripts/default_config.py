@@ -173,6 +173,7 @@ def get_default_config():
     cfg.loss.part_based.weights[PARTS] = CN()
     cfg.loss.part_based.weights[PARTS].id = 0.
     cfg.loss.part_based.weights[PARTS].tr = 1.
+    cfg.loss.part_based.weights[PARTS].cr = 0.3
     cfg.loss.part_based.weights[PIXELS] = CN()
     cfg.loss.part_based.weights[PIXELS].ce = 0.35
     cfg.loss.softmax = CN()
@@ -194,7 +195,7 @@ def get_default_config():
     cfg.test.evaluate = False # test only
     cfg.test.start_eval = 0 # start to evaluate after a specific epoch
     cfg.test.rerank = False # use person re-ranking
-    cfg.test.visrank = False # visualize ranked results (only available when cfg.test.evaluate=True)
+    cfg.test.visrank = True # visualize ranked results (only available when cfg.test.evaluate=True)
     cfg.test.visrank_topk = 10 # top-k ranks to visualize
     cfg.test.visrank_count = 10 # number of top-k ranks to plot
     cfg.test.visrank_q_idx_list = [0, 1, 2, 3, 4, 5]  # list of ids of queries for which we want to plot topk rank. If len(visrank_q_idx_list) < visrank_count, remaining ids will be random
@@ -276,7 +277,7 @@ def imagedata_kwargs(cfg):
         'cuhk03_labeled': cfg.cuhk03.labeled_images,
         'cuhk03_classic_split': cfg.cuhk03.classic_split,
         'market1501_500k': cfg.market1501.use_500k_distractors,
-        'use_masks': cfg.loss.name == 'part_based',
+        'use_masks': False,#cfg.loss.name == 'part_based',
         'masks_dir': cfg.model.bpbreid.masks.dir,
     }
 

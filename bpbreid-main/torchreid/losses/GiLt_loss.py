@@ -6,6 +6,7 @@ from collections import OrderedDict
 from torchmetrics import Accuracy
 from torchreid.losses import init_part_based_triplet_loss, CrossEntropyLoss
 from torchreid.utils.constants import GLOBAL, FOREGROUND, CONCAT_PARTS, PARTS
+from center_loss import CenterLoss
 
 
 class GiLtLoss(nn.Module):
@@ -21,10 +22,11 @@ class GiLtLoss(nn.Module):
         GLOBAL: {'id': 1., 'tr': 0.},
         FOREGROUND: {'id': 1., 'tr': 0.},
         CONCAT_PARTS: {'id': 1., 'tr': 0.},
-        PARTS: {'id': 0., 'tr': 1.}
+        PARTS: {'id': 0., 'tr': 1., 'cr':0.3}
     }
 
     def __init__(self,
+                 num_classes,
                  losses_weights=None,
                  use_visibility_scores=False,
                  triplet_margin=0.3,
@@ -40,6 +42,7 @@ class GiLtLoss(nn.Module):
         self.losses_weights = losses_weights
         self.part_triplet_loss = init_part_based_triplet_loss(loss_name, margin=triplet_margin, writer=writer)
         self.identity_loss = CrossEntropyLoss(label_smooth=True)
+        self.center_loss = CenterLoss(num_classes, feat_dim=512, use_gpu=True)
         self.use_visibility_scores = use_visibility_scores
 
     def forward(self, embeddings_dict, visibility_scores_dict, id_cls_scores_dict, pids):
@@ -82,6 +85,17 @@ class GiLtLoss(nn.Module):
                 loss_info['t'] = parts_triplet_loss
                 loss_info['tt'] = parts_trivial_triplets_ratio
                 loss_info['vt'] = parts_valid_triplets_ratio
+            loss_summary[key] = loss_info
+
+        for key in [GLOBAL, FOREGROUND, CONCAT_PARTS, PARTS]:
+            loss_info = OrderedDict() if key not in loss_summary else loss_summary[key]
+            cr_w = self.losses_weights[key]['cr']
+            if cr_w > 0:
+                head_center_loss = self.compute_center_loss(embeddings_dict[key], visibility_scores_dict[key], pids)
+                losses.append((cr_w, head_center_loss))
+                # loss_info['t'] = parts_triplet_loss
+                # loss_info['tt'] = parts_trivial_triplets_ratio
+                # loss_info['vt'] = parts_valid_triplets_ratio
 
             loss_summary[key] = loss_info
 
@@ -101,6 +115,16 @@ class GiLtLoss(nn.Module):
         triplet_loss, trivial_triplets_ratio, valid_triplets_ratio = self.part_triplet_loss(embeddings, pids,
                                                                                             parts_visibility=visibility)
         return triplet_loss, trivial_triplets_ratio, valid_triplets_ratio
+
+    def compute_center_loss(self, embeddings, visibility_scores, pids):
+        if self.use_visibility_scores:
+            visibility = visibility_scores if len(visibility_scores.shape) == 2 else visibility_scores.unsqueeze(1)
+        else:
+            visibility = None
+        embeddings = embeddings if len(embeddings.shape) == 3 else embeddings.unsqueeze(1)
+        embeddings = embeddings[:, 1:2]
+        center_loss = self.center_loss(embeddings.squeeze(1),pids)
+        return center_loss
 
     def compute_id_cls_loss(self, id_cls_scores, visibility_scores, pids):
         if len(id_cls_scores.shape) == 3:

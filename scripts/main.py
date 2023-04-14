@@ -24,7 +24,7 @@ def build_datamanager(cfg):
         return torchreid.data.VideoDataManager(**videodata_kwargs(cfg))
 
 
-def build_engine(cfg, datamanager, model, optimizer, scheduler, writer, engine_state):
+def build_engine(cfg, datamanager, model, optimizer, scheduler, writer, engine_state,num_classes):
     if cfg.data.type == 'image':
         if cfg.loss.name == 'softmax':
             engine = torchreid.engine.ImageSoftmaxEngine(
@@ -57,6 +57,7 @@ def build_engine(cfg, datamanager, model, optimizer, scheduler, writer, engine_s
 
         elif cfg.loss.name == 'part_based':
             engine = torchreid.engine.ImagePartBasedEngine(
+                num_classes,
                 datamanager,
                 model,
                 optimizer=optimizer,
@@ -264,7 +265,8 @@ def build_torchreid_model_engine(cfg):
     print(
         'Building {}-engine for {}-reid'.format(cfg.loss.name, cfg.data.type)
     )
-    engine = build_engine(cfg, datamanager, model, optimizer, scheduler, writer, engine_state)
+    num_classes = datamanager.num_train_pids,
+    engine = build_engine(cfg, datamanager, model, optimizer, scheduler, writer, engine_state, num_classes)
     return engine, model
 
 
